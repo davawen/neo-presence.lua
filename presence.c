@@ -27,10 +27,6 @@ void init() {
     DISCORD_REQUIRE(DiscordCreate(DISCORD_VERSION, &params, &core));
 
 	activities = core->get_activity_manager(core);
-
-    // DiscordBranch branch;
-    // app.application->get_current_branch(app.application, &branch);
-    // printf("current branch: %s\n", branch);
 }
 
 void set_activity(struct DiscordActivity *activity) {
