@@ -33,4 +33,7 @@ if [ ! -e "libdiscord_game_sdk.so" ]; then
 fi
 
 gcc -fPIC -c presence.c -o presence.o # compile (shared) object file
-gcc -shared presence.o -L . -ldiscord_game_sdk -o libpresence.so # create shared library (depending on discord library)
+
+# gcc -shared presence.o -L . -ldiscord_game_sdk -o libpresence.so # create shared library (depending on discord library)
+# since the lua file plugin is in another folder, there are a few problems with relative paths. it's easier to link with absolute paths (since it's built on the user's machine anyway)
+gcc -shared presence.o $(realpath libdiscord_game_sdk.so) -o libpresence.so

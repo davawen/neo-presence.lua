@@ -3,8 +3,7 @@
 
 #define DISCORD_REQUIRE(x) assert(x == DiscordResult_Ok)
 
-void DISCORD_CALLBACK UpdateActivityCallback(void* data, enum EDiscordResult result)
-{
+void DISCORD_CALLBACK UpdateActivityCallback(void* data, enum EDiscordResult result) {
     DISCORD_REQUIRE(result);
 }
 
@@ -37,6 +36,6 @@ void run_callbacks() {
 	DISCORD_REQUIRE(core->run_callbacks(core));
 }
 
-void quit() {
+void clear() {
 	activities->clear_activity(activities, NULL, UpdateActivityCallback);
 }
