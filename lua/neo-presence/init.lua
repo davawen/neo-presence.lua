@@ -27,11 +27,11 @@ function M.setup(opts)
 
 	vim.api.nvim_create_user_command("Neopresence", function ()
 		presence.start()
-	end)
+	end, {})
 
 	vim.api.nvim_create_user_command("NeopresenceQuit", function ()
 		presence.stop()
-	end)
+	end, {})
 
 	-- TODO: implement idling
 end
