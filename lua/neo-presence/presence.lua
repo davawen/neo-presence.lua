@@ -1,5 +1,7 @@
 local M = {}
 
+local available_filetypes = require('neo-presence.available_filetypes')
+
 local ffi = require('ffi')
 
 local function read_file(path)
@@ -19,24 +21,49 @@ local top_directory = script_path() .. "../../"
 local header = read_file(top_directory .. "discord_game_sdk_processed.h")
 ffi.cdef(header)
 
-ffi.cdef [[ void printf(const char *fmt, ...); ]]
 ffi.cdef [[
-	void init();
-	void set_activity(struct DiscordActivity *activity);
-	void run_callbacks();
-	void clear();
+	enum EDiscordResult init();
+	enum EDiscordResult run_callbacks();
+	void quit();
+
+	typedef void (*lua_callback_t)(enum EDiscordResult result);
+	void set_activity(struct DiscordActivity *activity, lua_callback_t lua_callback);
 ]]
 
 local presence = ffi.load(top_directory .. "libpresence.so")
 local activity = ffi.new("struct DiscordActivity[1]")
 
-local available_filetypes = require('neo-presence.available_filetypes')
+local update_activity_callback = ffi.new("lua_callback_t", function (result)
+	if result ~= "DiscordResult_Ok" then
+		error("neo-presence.lua: failed to set activity, got: " .. tostring(result), vim.log.levels.ERROR)
+	end
+end)
+
+--- @type uv_timer_t|nil
+--- if callback timer is set to nil, the library is unloaded
+local callback_timer = nil
+
+local function callback_loop()
+	local result = presence.run_callbacks()
+	if result ~= "DiscordResult_Ok" then
+		error(
+			"neo-presence.lua: failed to run discord callbacks, got: " .. tostring(result),
+			vim.log.levels.ERROR
+		)
+	end
+
+	callback_timer = vim.defer_fn(callback_loop, 1000)
+end
 
 local function set_buffer_state()
+	if not callback_timer then
+		return
+	end
+
 	local bufname = vim.api.nvim_buf_get_name(0)
 
-	local filename = vim.fn.fnamemodify(bufname, ':t') 
-	local extension = vim.fn.fnamemodify(bufname, ':e') 
+	local filename = vim.fn.fnamemodify(bufname, ':t')
+	local extension = vim.fn.fnamemodify(bufname, ':e')
 
 	if vim.bo.buftype == "terminal" then
 		activity[0].state = "In terminal"
@@ -47,7 +74,11 @@ local function set_buffer_state()
 		activity[0].assets.small_image = "txt"
 		activity[0].assets.small_text = filename
 	elseif vim.bo.buftype == "" then
-		activity[0].state = "Editing " .. filename
+		if filename == "" then
+			activity[0].state = "Editing an unnamed buffer"
+		else
+			activity[0].state = "Editing " .. filename
+		end
 
 		local icon_text = "txt"
 
@@ -55,21 +86,25 @@ local function set_buffer_state()
 		if extension and available_filetypes[extension] == true then
 			icon_text = extension
 		elseif available_filetypes[vim.bo.filetype] == true then
-			icon_text = vim.bo.filetype 
+			icon_text = vim.bo.filetype
 		end
 
 		local icon = icon_text:gsub("[^%w%s]", "_")
 		activity[0].assets.small_image = icon
 		activity[0].assets.small_text = icon_text
 	end
-	presence.set_activity(activity)
+	presence.set_activity(activity, update_activity_callback)
 end
 
 local function set_project_state()
+	if not callback_timer then
+		return
+	end
+
 	local dir = vim.fn.fnamemodify(vim.fn.getcwd(), ':~')
 	activity[0].details = "In: " .. dir
 
-	presence.set_activity(activity)
+	presence.set_activity(activity, update_activity_callback)
 end
 
 local function create_autocommands()
@@ -78,15 +113,15 @@ local function create_autocommands()
 	autocmd({ "DirChanged" }, { callback = set_project_state })
 end
 
-local callback_timer = nil
-local function run_callback()
-	presence.run_callbacks()
-
-	callback_timer = vim.defer_fn(run_callback, 1000)
-end
-
 function M.start()
-	presence.init()
+	local result = presence.init()
+	if result == "DiscordResult_InternalError" then
+		print("neo-presence.lua: discord isn't launched")
+		return
+	elseif result ~= "DiscordResult_Ok" then
+		error("neo-presence.lua: failed to start: " .. tostring(result), vim.log.levels.WARN)
+		return
+	end
 
 	activity[0] = {
 		type = "DiscordActivityType_Playing",
@@ -104,11 +139,11 @@ function M.start()
 		instance = false
 	}
 
+	callback_loop()
+
 	create_autocommands()
 	set_buffer_state()
 	set_project_state()
-
-	run_callback()
 end
 
 function M.stop()
@@ -119,8 +154,7 @@ function M.stop()
 		callback_timer = nil
 	end
 
-	presence.clear()
-	presence.run_callbacks()
+	presence.quit()
 end
 
 return M

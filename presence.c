@@ -1,41 +1,46 @@
 #include <assert.h>
 #include "discord_game_sdk.h"
 
-#define DISCORD_REQUIRE(x) assert(x == DiscordResult_Ok)
+struct IDiscordCore *core = NULL;
+struct IDiscordActivityManager *activities = NULL;
 
-void DISCORD_CALLBACK UpdateActivityCallback(void* data, enum EDiscordResult result) {
-    DISCORD_REQUIRE(result);
-}
-
-struct IDiscordUserEvents users_events = { 0 };
-struct IDiscordActivityEvents activities_events = { 0 };
-struct IDiscordRelationshipEvents relationships_events = { 0 };
-
-struct IDiscordCore *core;
-struct IDiscordActivityManager *activities;
-
-void init() {
+enum EDiscordResult init() {
 	struct DiscordCreateParams params = { 0 };
     DiscordCreateParamsSetDefault(&params);
     params.client_id = 998703402257240084;
-    params.flags = DiscordCreateFlags_Default;
-    params.activity_events = &activities_events;
-    params.relationship_events = &relationships_events;
-    params.user_events = &users_events;
+    params.flags = DiscordCreateFlags_NoRequireDiscord;
 
-    DISCORD_REQUIRE(DiscordCreate(DISCORD_VERSION, &params, &core));
+    enum EDiscordResult r = DiscordCreate(DISCORD_VERSION, &params, &core);
+	if (r != DiscordResult_Ok) {
+		core = NULL;
+		return r;
+	}
 
 	activities = core->get_activity_manager(core);
+
+	return r;
 }
 
-void set_activity(struct DiscordActivity *activity) {
-	activities->update_activity(activities, activity, NULL, UpdateActivityCallback);
+enum EDiscordResult run_callbacks() {
+	assert(core != NULL); // TODO: communicate null error to user
+
+	return core->run_callbacks(core);
 }
 
-void run_callbacks() {
-	DISCORD_REQUIRE(core->run_callbacks(core));
+void quit() {
+	if (core != NULL) core->destroy(core);
+	core = NULL;
+	activities = NULL;
 }
 
-void clear() {
-	activities->clear_activity(activities, NULL, UpdateActivityCallback);
+typedef void (*lua_callback_t)(enum EDiscordResult result);
+
+void update_activity_callback(void* data, enum EDiscordResult result) {
+	((lua_callback_t) data)(result);
+}
+
+void set_activity(struct DiscordActivity *activity, lua_callback_t lua_callback) {
+	assert(activities != NULL);
+
+	activities->update_activity(activities, activity, lua_callback, update_activity_callback);
 }

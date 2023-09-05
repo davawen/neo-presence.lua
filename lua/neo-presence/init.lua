@@ -1,7 +1,6 @@
 local M = {}
 
---- @params opts? any Doesn't take any options
-function M.setup(opts)
+function M.setup(_)
 	local presence = require('neo-presence.presence')
 
 	presence.start()
