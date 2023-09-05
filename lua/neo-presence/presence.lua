@@ -31,7 +31,8 @@ ffi.cdef [[
 ]]
 
 local presence = ffi.load(top_directory .. "libpresence.so")
-local activity = ffi.new("struct DiscordActivity[1]")
+local activity_ptr = ffi.new("struct DiscordActivity[1]")
+local activity = activity_ptr[0]
 
 local update_activity_callback = ffi.new("lua_callback_t", function (result)
 	if result ~= "DiscordResult_Ok" then
@@ -66,18 +67,18 @@ local function set_buffer_state()
 	local extension = vim.fn.fnamemodify(bufname, ':e')
 
 	if vim.bo.buftype == "terminal" then
-		activity[0].state = "In terminal"
-		activity[0].assets.small_image = "terminal"
-		activity[0].assets.small_text = filename
+		activity.state = "In terminal"
+		activity.assets.small_image = "terminal"
+		activity.assets.small_text = filename
 	elseif vim.bo.buftype == "help" then
-		activity[0].state = "Reading help pages"
-		activity[0].assets.small_image = "txt"
-		activity[0].assets.small_text = filename
+		activity.state = "Reading help pages"
+		activity.assets.small_image = "txt"
+		activity.assets.small_text = filename
 	elseif vim.bo.buftype == "" then
 		if filename == "" then
-			activity[0].state = "Editing an unnamed buffer"
+			activity.state = "Editing an unnamed buffer"
 		else
-			activity[0].state = "Editing " .. filename
+			activity.state = "Editing " .. filename
 		end
 
 		local icon_text = "txt"
@@ -90,10 +91,10 @@ local function set_buffer_state()
 		end
 
 		local icon = icon_text:gsub("[^%w%s]", "_")
-		activity[0].assets.small_image = icon
-		activity[0].assets.small_text = icon_text
+		activity.assets.small_image = icon
+		activity.assets.small_text = icon_text
 	end
-	presence.set_activity(activity, update_activity_callback)
+	presence.set_activity(activity_ptr, update_activity_callback)
 end
 
 local function set_project_state()
@@ -102,15 +103,17 @@ local function set_project_state()
 	end
 
 	local dir = vim.fn.fnamemodify(vim.fn.getcwd(), ':~')
-	activity[0].details = "In: " .. dir
+	activity.details = "In: " .. dir
 
-	presence.set_activity(activity, update_activity_callback)
+	presence.set_activity(activity_ptr, update_activity_callback)
 end
 
 local function create_autocommands()
+	local group = vim.api.nvim_create_augroup("NeoPresenceState", { clear = true })
+
 	local autocmd = vim.api.nvim_create_autocmd
-	autocmd({ "BufEnter" }, { callback = set_buffer_state })
-	autocmd({ "DirChanged" }, { callback = set_project_state })
+	autocmd({ "BufEnter" }, { callback = set_buffer_state, group = group })
+	autocmd({ "DirChanged" }, { callback = set_project_state, group = group })
 end
 
 function M.start()
@@ -123,7 +126,7 @@ function M.start()
 		return
 	end
 
-	activity[0] = {
+	activity_ptr[0] = {
 		type = "DiscordActivityType_Playing",
 		name = "Neovim",
 		status = "",
@@ -138,6 +141,7 @@ function M.start()
 		},
 		instance = false
 	}
+	activity = activity_ptr[0]
 
 	callback_loop()
 
@@ -147,7 +151,7 @@ function M.start()
 end
 
 function M.stop()
-	-- TODO: Clear autocommands
+	vim.api.nvim_del_augroup_by_name("NeoPresenceState")
 
 	if callback_timer then
 		callback_timer:close()
