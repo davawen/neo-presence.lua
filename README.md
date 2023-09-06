@@ -2,9 +2,10 @@
 
 A neovim rich presence plugin for discord using luajit FFI.
 
-## Usage
+## Installation
 
-The plugin automatically downloads the [Discord GameSDK](https://discord.com/developers/docs/game-sdk/sdk-starter-guide), you just have to run `build.sh` and call setup:
+The plugin automatically downloads the [Discord GameSDK](https://discord.com/developers/docs/game-sdk/sdk-starter-guide), you just have to run `build.sh`.  
+You need `gcc`, `curl`, `unzip`, and `cpp` (C Preprocessor) to build the library.
 
 ### [lazy.nvim](https://github.com/folke/lazy.nvim)
 
@@ -25,4 +26,14 @@ Plug 'davawen/neo-presence.lua', { 'do': './build.sh' }
 
 ```lua
 require('neo-presence').setup {}
+```
+
+## Usage
+
+Setup options:
+```lua
+{
+	autostart = true, -- automatically load plugin on setup, otherwise call `require('neo-presence.presence').start` or `:Neopresence`
+	autostop = true -- automatically create an autocommand on "VimLeave" to quit plugin, otherwise call `require('neo-presence.presence).stop` or `NeopresenceQuit`
+}
 ```
