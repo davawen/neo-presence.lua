@@ -35,7 +35,7 @@ local activity_ptr = ffi.new("struct DiscordActivity[1]")
 local activity = activity_ptr[0]
 
 local update_activity_callback = ffi.new("lua_callback_t", function (result)
-	if result ~= "DiscordResult_Ok" then
+	if result ~= "DiscordResult_Ok" and result ~= "DiscordResult_NotRunning" then
 		error("neo-presence.lua: failed to set activity, got: " .. tostring(result), vim.log.levels.ERROR)
 	end
 end)
@@ -46,7 +46,11 @@ local callback_timer = nil
 
 local function callback_loop()
 	local result = presence.run_callbacks()
-	if result ~= "DiscordResult_Ok" then
+	if result == "DiscordResult_NotRunning" then
+		print("neo-presence.lua: discord not running, quitting neopresence...")
+		M.stop()
+		return
+	elseif result ~= "DiscordResult_Ok" then
 		error(
 			"neo-presence.lua: failed to run discord callbacks, got: " .. tostring(result),
 			vim.log.levels.ERROR
@@ -118,7 +122,7 @@ end
 
 function M.start()
 	local result = presence.init()
-	if result == "DiscordResult_InternalError" then
+	if result == "DiscordResult_InternalError" or result == "DiscordResult_NotRunning" then
 		print("neo-presence.lua: discord isn't launched")
 		return
 	elseif result ~= "DiscordResult_Ok" then
