@@ -37,3 +37,7 @@ Setup options:
 	autostop = true -- automatically create an autocommand on "VimLeave" to quit plugin, otherwise call `require('neo-presence.presence).stop` or `NeopresenceQuit`
 }
 ```
+
+## For [WebCord](https://github.com/SpacingBat3/WebCord) or Discord Web users
+
+WebCord doesn't support Rich Presence by default. If you want it, you either need to manually connect it to [arRPC](https://github.com/OpenAsar/arrpc), or use another Discord client that supports Rich Presence out of the box, like the official client or [Vesktop](https://github.com/Vencord/Vesktop#vencord-desktop).
