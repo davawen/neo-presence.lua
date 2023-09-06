@@ -155,9 +155,9 @@ function M.start()
 end
 
 function M.stop()
-	vim.api.nvim_del_augroup_by_name("NeoPresenceState")
-
 	if callback_timer then
+		vim.api.nvim_del_augroup_by_name("NeoPresenceState")
+
 		callback_timer:close()
 		callback_timer = nil
 	end
