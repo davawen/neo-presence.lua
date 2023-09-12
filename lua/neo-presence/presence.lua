@@ -3,6 +3,7 @@ local M = {}
 local available_filetypes = require('neo-presence.available_filetypes')
 
 local ffi = require('ffi')
+local uv = vim.uv
 
 local function read_file(path)
 	local f = assert(io.open(path, "r"))
@@ -35,29 +36,24 @@ local activity_ptr = ffi.new("struct DiscordActivity[1]")
 local activity = activity_ptr[0]
 
 local update_activity_callback = ffi.new("lua_callback_t", function (result)
-	if result ~= "DiscordResult_Ok" and result ~= "DiscordResult_NotRunning" then
-		error("neo-presence.lua: failed to set activity, got: " .. tostring(result), vim.log.levels.ERROR)
+	if result ~= "DiscordResult_Ok" and result ~= "DiscordResult_NotRunning" and result ~= "DiscordResult_TransactionAborted" then
+		vim.notify("neo-presence.lua: failed to set activity, got: " .. tostring(result), vim.log.levels.ERROR)
 	end
 end)
 
+
 --- @type uv_timer_t|nil
---- if callback timer is set to nil, the library is unloaded
+--- callback timer is set to nil when the library is unloaded
 local callback_timer = nil
 
-local function callback_loop()
+local function run_callbacks()
 	local result = presence.run_callbacks()
 	if result == "DiscordResult_NotRunning" then
-		print("neo-presence.lua: discord not running, quitting neopresence...")
+		vim.notify("neo-presence.lua: discord not running, quitting neopresence...", vim.log.levels.INFO)
 		M.stop()
-		return
-	elseif result ~= "DiscordResult_Ok" then
-		error(
-			"neo-presence.lua: failed to run discord callbacks, got: " .. tostring(result),
-			vim.log.levels.ERROR
-		)
+	elseif result ~= "DiscordResult_Ok" and result ~= "DiscordResult_TransactionAborted" then
+		vim.notify("neo-presence.lua: failed to run discord callbacks, got: " .. tostring(result), vim.log.levels.ERROR)
 	end
-
-	callback_timer = vim.defer_fn(callback_loop, 1000)
 end
 
 local function set_buffer_state()
@@ -122,11 +118,11 @@ end
 
 function M.start()
 	local result = presence.init()
-	if result == "DiscordResult_InternalError" or result == "DiscordResult_NotRunning" then
-		print("neo-presence.lua: discord isn't launched")
+	if result == "DiscordResult_InternalError" or result == "DiscordResult_NotRunning" or result == "DiscordResult_TransactionAborted" then
+		vim.notify("neo-presence.lua: discord isn't launched", vim.log.levels.INFO)
 		return
 	elseif result ~= "DiscordResult_Ok" then
-		error("neo-presence.lua: failed to start: " .. tostring(result), vim.log.levels.WARN)
+		vim.notify("neo-presence.lua: failed to start: " .. tostring(result), vim.log.levels.WARN)
 		return
 	end
 
@@ -147,7 +143,10 @@ function M.start()
 	}
 	activity = activity_ptr[0]
 
-	callback_loop()
+	callback_timer = uv.new_timer()
+	callback_timer:start(1000, 1000, 
+		vim.schedule_wrap(run_callbacks)
+	)
 
 	create_autocommands()
 	set_buffer_state()
@@ -158,11 +157,12 @@ function M.stop()
 	if callback_timer then
 		vim.api.nvim_del_augroup_by_name("NeoPresenceState")
 
+		callback_timer:stop()
 		callback_timer:close()
 		callback_timer = nil
 	end
 
-	presence.quit()
+	presence.quit() -- just in case something got out of sync, always close it
 end
 
 return M

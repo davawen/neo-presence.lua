@@ -22,6 +22,7 @@ enum EDiscordResult init() {
 }
 
 enum EDiscordResult run_callbacks() {
+	// (this crashes neovim, which is pretty bad)
 	assert(core != NULL); // TODO: communicate null error to user
 
 	return core->run_callbacks(core);
