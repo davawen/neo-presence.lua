@@ -22,8 +22,8 @@ enum EDiscordResult init() {
 }
 
 enum EDiscordResult run_callbacks() {
-	// (this crashes neovim, which is pretty bad)
-	assert(core != NULL); // TODO: communicate null error to user
+	// TODO: communicate null error to user
+	if(core == NULL) return DiscordResult_InternalError;
 
 	return core->run_callbacks(core);
 }
@@ -41,7 +41,8 @@ void update_activity_callback(void* data, enum EDiscordResult result) {
 }
 
 void set_activity(struct DiscordActivity *activity, lua_callback_t lua_callback) {
-	assert(activities != NULL);
+	// TODO: communicate null error to user
+	if(activities == NULL) return;
 
 	activities->update_activity(activities, activity, lua_callback, update_activity_callback);
 }
