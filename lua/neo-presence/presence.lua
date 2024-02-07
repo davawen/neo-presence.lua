@@ -91,6 +91,11 @@ local function set_buffer_state()
 		end
 
 		local icon = icon_text:gsub("[^%w%s]", "_")
+		if icon_text:len() == 1 then
+			-- discord throws an error with text of length 1
+			icon = "___" .. icon
+			icon_text = icon_text .. " "
+		end
 		activity.assets.small_image = icon
 		activity.assets.small_text = icon_text
 	end
