@@ -3,7 +3,7 @@ local M = {}
 local available_filetypes = require('neo-presence.available_filetypes')
 
 local ffi = require('ffi')
-local uv = vim.uv
+local uv = vim.loop
 
 local function read_file(path)
 	local f = assert(io.open(path, "r"))
